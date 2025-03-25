@@ -27,24 +27,26 @@ function Dashboard() {
       try {
         const projectsResponse = await fetch('http://127.0.0.1:8000/api/projects', {
           headers: {
-            'Authorization': Bearer ${token},
+            'Authorization': `Bearer ${token}`,  // Corrected Template Literal Syntax
             'Content-Type': 'application/json',
-          },
+          }
         });
+
         if (!projectsResponse.ok) {
-          throw new Error(HTTP error! status: ${projectsResponse.status});
+          throw new Error(`HTTP error! status: ${projectsResponse.status}`);
         }
         const projectsData = await projectsResponse.json();
         setProjects(projectsData);
 
         const tasksResponse = await fetch('http://127.0.0.1:8000/api/tasks', {
           headers: {
-            'Authorization': Bearer ${token},
+            'Authorization': `Bearer ${token}`,  // Corrected Template Literal Syntax
             'Content-Type': 'application/json',
-          },
+          }
         });
+
         if (!tasksResponse.ok) {
-          throw new Error(HTTP error! status: ${tasksResponse.status});
+          throw new Error(`HTTP error! status: ${tasksResponse.status}`);
         }
         const tasksData = await tasksResponse.json();
         setTasks(tasksData);
@@ -67,15 +69,14 @@ function Dashboard() {
       const response = await fetch('http://127.0.0.1:8000/api/auth/logout', {
         method: 'POST',
         headers: {
-          'Authorization': Bearer ${token},
+          'Authorization': `Bearer ${token}`,  // Corrected Template Literal Syntax
           'Content-Type': 'application/json',
-        },
+        }
       });
 
       if (response.ok) {
         logout(); 
       } else {
-        
         const errorData = await response.json(); 
         console.error('Logout failed:', response.status, errorData); 
 

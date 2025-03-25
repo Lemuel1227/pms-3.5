@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\api\ProjectController;
 use App\Http\Controllers\api\TaskController;
+use App\Http\Controllers\api\AuthController;
 
 Route::apiResource('projects', ProjectController::class);
 Route::get('projects/{project}/tasks', [TaskController::class, 'projectTasks']);
