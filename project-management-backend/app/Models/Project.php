@@ -12,16 +12,25 @@ class Project extends Model
     protected $fillable = [
         'name', 
         'description', 
-        'user_id'
+        'start_date',
+        'end_date',
+        'status',
+        'created_by'
     ];
+
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
+    ];
+
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
     public function tasks()
     {
         return $this->hasMany(Task::class);
-    }
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
     }
 }

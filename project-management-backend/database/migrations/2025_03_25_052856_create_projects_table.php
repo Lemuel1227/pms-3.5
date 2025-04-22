@@ -12,13 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('projects', function (Blueprint $table) {
-            $table->id();
+            $table->id(); 
             $table->string('name');
             $table->text('description')->nullable();
-            $table->unsignedBigInteger('user_id');
-            $table->timestamps();
+            $table->date('start_date')->nullable();
+            $table->date('end_date')->nullable();
+            $table->enum('status', ['Not Started', 'In Progress', 'On Hold', 'Completed'])->default('Not Started');
 
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreignId('created_by')
+                  ->constrained('users') 
+                  ->onDelete('cascade'); 
+            $table->timestamps(); 
         });
     }
 

@@ -47,14 +47,24 @@ class User extends Authenticatable
         ];
     }
 
-    public function projects()
+    public function createdProjects()
     {
-        return $this->hasMany(Project::class);
+        return $this->hasMany(Project::class, 'created_by');
     }
 
     public function assignedTasks()
     {
-        return $this->hasMany(Task::class, 'assigned_user_id');
+        return $this->hasMany(Task::class, 'assigned_to');
+    }
+
+    public function createdTasks()
+    {
+        return $this->hasMany(Task::class, 'created_by');
+    }
+
+    public function projects()
+    {
+        return $this->belongsToMany(Project::class);
     }
 }
 

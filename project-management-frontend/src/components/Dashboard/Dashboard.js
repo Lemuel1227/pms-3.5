@@ -1,144 +1,46 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Nav, Card, Button } from 'react-bootstrap';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import ProjectsTable from '../Dashboard/ProjectsTable';
-import TasksTable from '../Dashboard/TasksTable';
-import { useAuth } from '../../context/AuthContext'; 
-import { useNavigate } from 'react-router-dom';
+// src/components/Dashboard/Dashboard.js
+import React from 'react';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
 
 function Dashboard() {
-  const [projects, setProjects] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState('projects');
-  const { isLoggedIn, token, logout, loading: authLoading } = useAuth(); 
-  const navigate = useNavigate();
+    const { logout } = useAuth();
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!isLoggedIn && !authLoading) {
-      navigate('/login'); 
-      return;
-    }
-
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const projectsResponse = await fetch('http://127.0.0.1:8000/api/projects', {
-          headers: {
-            'Authorization': `Bearer ${token}`,  // Corrected Template Literal Syntax
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!projectsResponse.ok) {
-          throw new Error(`HTTP error! status: ${projectsResponse.status}`);
-        }
-        const projectsData = await projectsResponse.json();
-        setProjects(projectsData);
-
-        const tasksResponse = await fetch('http://127.0.0.1:8000/api/tasks', {
-          headers: {
-            'Authorization': `Bearer ${token}`,  // Corrected Template Literal Syntax
-            'Content-Type': 'application/json',
-          }
-        });
-
-        if (!tasksResponse.ok) {
-          throw new Error(`HTTP error! status: ${tasksResponse.status}`);
-        }
-        const tasksData = await tasksResponse.json();
-        setTasks(tasksData);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
+    const handleLogout = () => {
+        logout();
+        // No need to navigate here, AuthContext handles it
     };
 
-    fetchData();
-  }, [isLoggedIn, token, authLoading, navigate]); 
+    return (
+        <div>
+            <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+                <div className="container-fluid">
+                    <Link className="navbar-brand" to="/dashboard">Klick Inc. PMS</Link>
+                    <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#dashboardNavbar" aria-controls="dashboardNavbar" aria-expanded="false" aria-label="Toggle navigation">
+                        <span className="navbar-toggler-icon"></span>
+                    </button>
+                    <div className="collapse navbar-collapse" id="dashboardNavbar">
+                        <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+                            <li className="nav-item">
+                                <Link className="nav-link" to="projects">Projects</Link>
+                            </li>
+                            <li className="nav-item">
+                                <Link className="nav-link" to="tasks">Tasks</Link>
+                            </li>
+                            {/* Add links for future sprints here */}
+                        </ul>
+                        <button className="btn btn-outline-light" onClick={handleLogout}>Logout</button>
+                    </div>
+                </div>
+            </nav>
 
-  const handleNavClick = (view) => {
-    setActiveView(view);
-  };
-
-  const handleLogout = async () => {
-    try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,  // Corrected Template Literal Syntax
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (response.ok) {
-        logout(); 
-      } else {
-        const errorData = await response.json(); 
-        console.error('Logout failed:', response.status, errorData); 
-
-        let errorMessage = 'Logout failed. Please try again.'; 
-        if (errorData && errorData.message) {
-          errorMessage = errorData.message; 
-        }
-        setError(errorMessage); 
-      }
-    } catch (error) {
-      console.error('Error during logout:', error);
-      setError('An error occurred during logout.');
-    }
-  };
-
-  let content;
-  if (!isLoggedIn) {
-    content = <div>Please log in to view the dashboard.</div>; 
-  } else if (loading) {
-    content = <div>Loading data...</div>;
-  } else if (error) {
-    content = <div>Error: {error}</div>;
-  } else {
-    content = (
-      <Card>
-        <Card.Header>{activeView === 'projects' ? 'Projects' : 'Tasks'}</Card.Header>
-        <Card.Body>
-          {activeView === 'projects' ? (
-            <ProjectsTable projects={projects} />
-          ) : (
-            <TasksTable tasks={tasks} />
-          )}
-        </Card.Body>
-      </Card>
+            <div className="container mt-4">
+                {/* Nested route content will be rendered here */}
+                <Outlet />
+            </div>
+        </div>
     );
-  }
-
-  return (
-    <Container>
-      <Row className="mb-3">
-        <Col className="d-flex justify-content-between align-items-center">
-          <h1>Dashboard</h1>
-          <Button variant="outline-danger" onClick={handleLogout}>
-            Logout
-          </Button>
-        </Col>
-      </Row>
-
-      <Nav variant="tabs" defaultActiveKey="projects" onSelect={handleNavClick}>
-        <Nav.Item>
-          <Nav.Link eventKey="projects">Projects</Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="tasks">Tasks</Nav.Link>
-        </Nav.Item>
-      </Nav>
-
-      <Row>
-        <Col md={12}>{content}</Col>
-      </Row>
-    </Container>
-  );
 }
 
 export default Dashboard;

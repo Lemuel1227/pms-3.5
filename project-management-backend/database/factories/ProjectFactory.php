@@ -18,12 +18,20 @@ class ProjectFactory extends Factory
      */
     protected $model = Project::class;
 
-    public function definition()
+    public function definition(): array
     {
+        $startDate = fake()->dateTimeBetween('-1 month', '+1 month');
+        $endDate = fake()->dateTimeBetween($startDate, '+6 months'); // Ensure end date is after start date
+
         return [
-            'name' => $this->faker->company,
-            'description' => $this->faker->paragraph,
-            'user_id' => User::factory(), 
+            'name' => fake()->company() . ' ' . fake()->bs(), // e.g., "Kling Inc strategize synergistic niches"
+            'description' => fake()->paragraph(2),
+            'start_date' => $startDate->format('Y-m-d'), // Format as date string
+            'end_date' => $endDate->format('Y-m-d'),     // Format as date string
+            'status' => fake()->randomElement(['Not Started', 'In Progress', 'On Hold', 'Completed']), // Use values from migration
+            'created_by' => User::inRandomOrder()->first()?->id ?? User::factory(),// 'created_by' will be set in the Seeder using relationships
+            // 'created_by' => User::factory(), // Or create a new user for each project (less efficient for seeding)
+            // 'created_by' => User::inRandomOrder()->first()->id, // Or assign randomly (can fail if no users exist yet)
         ];
     }
 }

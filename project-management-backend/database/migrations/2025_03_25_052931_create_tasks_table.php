@@ -13,15 +13,31 @@ return new class extends Migration
     {
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('project_id');
-            $table->string('task_name');
-            $table->enum('status', ['pending', 'in_progress', 'completed'])->default('pending');
-            $table->date('deadline')->nullable();
-            $table->unsignedBigInteger('assigned_user_id')->nullable();
+            $table->foreignId('project_id')
+                ->constrained('projects') 
+                ->onDelete('cascade'); 
+
+            $table->string('title');
+            $table->text('description')->nullable();
+            $table->enum('status', ['pending', 'in progress', 'completed'])->default('pending');
+            $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
+
+            $table->foreignId('assigned_user_id')
+                ->nullable() 
+                ->constrained('users') 
+                ->onDelete('set null'); 
+
+            $table->foreignId('created_by')
+                ->constrained('users') 
+                ->onDelete('cascade'); 
+
+            $table->date('due_date')->nullable();
+
             $table->timestamps();
 
-            $table->foreign('project_id')->references('id')->on('projects')->onDelete('cascade');
-            $table->foreign('assigned_user_id')->references('id')->on('users')->onDelete('set null');
+            $table->index('status');
+            $table->index('priority');
+            $table->index('due_date');
         });
     }
 
