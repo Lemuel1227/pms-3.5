@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
-import { API_BASE_URL } from '../../App'; // Import base URL
-import { Modal, Button, Form, Badge } from 'react-bootstrap'; // Using react-bootstrap
+import { useAuth } from '../../context/AuthContext'; 
+import { API_BASE_URL } from '../../App'; 
+import { Modal, Button, Form, Badge } from 'react-bootstrap';
 
 function TaskTable() {
     const { token } = useAuth();
@@ -24,7 +24,6 @@ function TaskTable() {
         due_date: '',
     });
 
-    // Use backend-consistent status values
     const taskStatuses = ['pending', 'in progress', 'completed'];
     const taskPriorities = ['low', 'medium', 'high'];
 
@@ -81,7 +80,7 @@ function TaskTable() {
             description: '',
             status: 'pending',
             priority: 'medium',
-            assigned_user_id: '',  // Empty string for 'Unassigned' in select
+            assigned_user_id: '', 
             due_date: '',
         });
         setShowModal(true);
@@ -96,8 +95,7 @@ function TaskTable() {
             description: task.description || '',
             status: task.status,
             priority: task.priority,
-            // Use the actual user ID, not the name
-            assigned_user_id: task.assigned_user_id || '',  // Will be empty string if null
+            assigned_user_id: task.assigned_user_id || '',  
             due_date: task.due_date ? task.due_date.split('T')[0] : '',
         });
         setShowModal(true);
@@ -135,16 +133,13 @@ function TaskTable() {
             return;
         }
     
-        // Prepare payload - convert empty string to null for assigned_user_id
         let payload = { ...formData };
         payload.assigned_user_id = formData.assigned_user_id === '' ? null : formData.assigned_user_id;
         
-        // Remove empty date string so backend receives null
         if (payload.due_date === '') {
             delete payload.due_date;
         }
     
-        // Debug log
         console.log("Payload to be sent:", JSON.stringify(payload, null, 2));
     
         try {
@@ -310,7 +305,6 @@ function TaskTable() {
     );
 }
 
-// Helper functions
 const getTaskStatusColor = (status) => {
     switch (status?.toLowerCase()) {
         case 'pending': return 'secondary';

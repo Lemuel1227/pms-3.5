@@ -1,8 +1,7 @@
-// src/components/Project/ProjectTable.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
-import { API_BASE_URL } from '../../App'; // Import base URL
-import { Modal, Button, Form } from 'react-bootstrap'; // Using react-bootstrap for modals
+import { useAuth } from '../../context/AuthContext'; 
+import { API_BASE_URL } from '../../App';
+import { Modal, Button, Form } from 'react-bootstrap'; 
 
 function ProjectTable() {
     const { token } = useAuth();
@@ -10,7 +9,6 @@ function ProjectTable() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Modal State
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentProject, setCurrentProject] = useState(null);
@@ -19,12 +17,11 @@ function ProjectTable() {
         description: '',
         start_date: '',
         end_date: '',
-        status: 'Not Started', // Default status
+        status: 'Not Started', 
     });
 
     const projectStatuses = ['Not Started', 'In Progress', 'On Hold', 'Completed'];
 
-    // --- Fetch Projects ---
     const fetchProjects = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -53,7 +50,6 @@ function ProjectTable() {
         fetchProjects();
     }, [fetchProjects]);
 
-    // --- Modal Handling ---
     const handleShowCreateModal = () => {
         setIsEditing(false);
         setCurrentProject(null);
@@ -73,7 +69,6 @@ function ProjectTable() {
         setFormData({
             name: project.name,
             description: project.description || '',
-            // Ensure dates are in YYYY-MM-DD format for the input type="date"
             start_date: project.start_date ? project.start_date.split('T')[0] : '',
             end_date: project.end_date ? project.end_date.split('T')[0] : '',
             status: project.status,
@@ -83,8 +78,8 @@ function ProjectTable() {
 
     const handleCloseModal = () => {
         setShowModal(false);
-        setCurrentProject(null); // Clear current project on close
-        setError(null); // Clear any form errors
+        setCurrentProject(null); 
+        setError(null); 
     };
 
     const handleInputChange = (e) => {
@@ -92,17 +87,15 @@ function ProjectTable() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // --- CRUD Operations ---
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null); // Clear previous errors
+        setError(null); 
 
         const url = isEditing
             ? `${API_BASE_URL}/projects/${currentProject.id}`
             : `${API_BASE_URL}/projects`;
         const method = isEditing ? 'PUT' : 'POST';
 
-        // Basic validation
         if (!formData.name.trim()) {
             setError("Project name cannot be empty.");
             return;
@@ -128,16 +121,12 @@ function ProjectTable() {
                 throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
 
-            // const result = await response.json(); // result contains the created/updated project
-
-            // Refresh project list and close modal
             fetchProjects();
             handleCloseModal();
 
         } catch (e) {
             console.error("Failed to save project:", e);
             setError(`Failed to save project: ${e.message}`);
-            // Keep modal open if there's an error
         }
     };
 
@@ -153,11 +142,10 @@ function ProjectTable() {
                     },
                 });
 
-                if (!response.ok && response.status !== 204) { // 204 No Content is OK for DELETE
+                if (!response.ok && response.status !== 204) { 
                      throw new Error(`HTTP error! status: ${response.status}`);
                  }
 
-                // Refresh project list
                 fetchProjects();
 
             } catch (e) {
@@ -168,9 +156,7 @@ function ProjectTable() {
     };
 
 
-    // --- Render Logic ---
     if (loading) return <div className="text-center">Loading Projects...</div>;
-    // Display fetch error prominently if it's not a form error
     if (error && !showModal) return <div className="alert alert-danger">{error}</div>;
 
 
@@ -217,14 +203,13 @@ function ProjectTable() {
                 </table>
             )}
 
-            {/* Create/Edit Project Modal */}
             <Modal show={showModal} onHide={handleCloseModal} backdrop="static" keyboard={false}>
                 <Modal.Header closeButton>
                     <Modal.Title>{isEditing ? 'Edit Project' : 'Create New Project'}</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleSubmit}>
                     <Modal.Body>
-                        {error && <div className="alert alert-danger">{error}</div>} {/* Display form errors */}
+                        {error && <div className="alert alert-danger">{error}</div>} 
                         <Form.Group className="mb-3" controlId="projectName">
                             <Form.Label>Project Name <span className="text-danger">*</span></Form.Label>
                             <Form.Control
@@ -275,7 +260,7 @@ function ProjectTable() {
                                 name="end_date"
                                 value={formData.end_date}
                                 onChange={handleInputChange}
-                                min={formData.start_date || undefined} // Basic validation hint
+                                min={formData.start_date || undefined} 
                             />
                         </Form.Group>
                     </Modal.Body>
@@ -293,7 +278,6 @@ function ProjectTable() {
     );
 }
 
-// Helper function for status badge colors (optional)
 const getStatusColor = (status) => {
     switch (status) {
         case 'Not Started': return 'secondary';

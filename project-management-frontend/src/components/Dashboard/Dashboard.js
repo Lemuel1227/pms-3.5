@@ -1,7 +1,6 @@
-// src/components/Dashboard/Dashboard.js
 import React from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; // Adjust path as needed
+import { useAuth } from '../../context/AuthContext'; 
 
 function Dashboard() {
     const { logout } = useAuth();
@@ -9,7 +8,6 @@ function Dashboard() {
 
     const handleLogout = () => {
         logout();
-        // No need to navigate here, AuthContext handles it
     };
 
     return (
@@ -28,7 +26,6 @@ function Dashboard() {
                             <li className="nav-item">
                                 <Link className="nav-link" to="tasks">Tasks</Link>
                             </li>
-                            {/* Add links for future sprints here */}
                         </ul>
                         <button className="btn btn-outline-light" onClick={handleLogout}>Logout</button>
                     </div>
@@ -36,7 +33,6 @@ function Dashboard() {
             </nav>
 
             <div className="container mt-4">
-                {/* Nested route content will be rendered here */}
                 <Outlet />
             </div>
         </div>
