@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Project extends Model
 {
@@ -16,7 +17,7 @@ class Project extends Model
         'end_date',
         'status',
         'created_by',
-        'budget'
+        'budget',
     ];
 
     protected $casts = [
@@ -25,6 +26,7 @@ class Project extends Model
         'budget' => 'decimal:2',
     ];
 
+    protected $appends = ['computed_status'];
 
     public function owner()
     {
@@ -41,9 +43,60 @@ class Project extends Model
         return $this->hasManyThrough(TimeLog::class, Task::class);
     }
 
-    public function remainingBudget()
+    public function budgets()
     {
-        return $this->budget - $this->tasks()->sum('budget');
+        return $this->hasMany(Budget::class);
     }
 
+    public function teamMembers()
+    {
+        return $this->hasMany(TeamMember::class);
+    }    
+
+    public function remainingBudget()
+    {
+        return $this->budget - $this->budgets()->sum('amount');
+    }
+
+    /**
+     * Get the computed status based on the current date and project timeline.
+     * 
+     * @return string
+     */
+    public function getComputedStatusAttribute()
+    {
+        $now = Carbon::now();
+        $startDate = $this->start_date ? Carbon::parse($this->start_date) : null;
+        $endDate = $this->end_date ? Carbon::parse($this->end_date) : null;
+        
+        // If no dates are set, return the manual status
+        if (!$startDate && !$endDate) {
+            return $this->status;
+        }
+        
+        // Determine status based on date
+        if ($startDate && $endDate) {
+            if ($now < $startDate) {
+                return 'Not Started';
+            } elseif ($now > $endDate) {
+                return 'Completed';
+            } else {
+                return 'In Progress';
+            }
+        } elseif ($startDate && !$endDate) {
+            if ($now < $startDate) {
+                return 'Not Started';
+            } else {
+                return 'In Progress';
+            }
+        } elseif (!$startDate && $endDate) {
+            if ($now > $endDate) {
+                return 'Completed';
+            } else {
+                return 'In Progress';
+            }
+        }
+        
+        return $this->status;
+    }
 }

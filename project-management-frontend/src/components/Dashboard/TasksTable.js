@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext'; 
-import { API_BASE_URL } from '../../App'; 
-import { Modal, Button, Alert, Form, Badge } from 'react-bootstrap';
+import { useAuth } from '../../context/AuthContext';
+import { API_BASE_URL } from '../../App';
+import { Modal, Button, Alert, Form, Badge, Card } from 'react-bootstrap';
+import TaskComments from './TaskComments';
 
 function TaskTable() {
-    const { token } = useAuth();
+    const { token, user } = useAuth();
     const [tasks, setTasks] = useState([]);
     const [projects, setProjects] = useState([]);
     const [users, setUsers] = useState([]);
+    const [teamMembers, setTeamMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [apiError, setApiError] = useState(null); // New state for API-specific errors
+    const [apiError, setApiError] = useState(null);
 
     const [showModal, setShowModal] = useState(false);
+    const [showCommentsModal, setShowCommentsModal] = useState(false);
+    const [currentTaskId, setCurrentTaskId] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [currentTask, setCurrentTask] = useState(null);
     const [formData, setFormData] = useState({
@@ -21,8 +25,7 @@ function TaskTable() {
         description: '',
         status: 'pending',
         priority: 'medium',
-        budget: '',
-        assigned_user_id: null,
+        assigned_user_id: '',
         start_time: '',
         end_time: '',
     });
@@ -33,7 +36,7 @@ function TaskTable() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
-        setApiError(null); // Clear API errors on new fetch
+        setApiError(null);
         try {
             const [tasksResponse, projectsResponse, usersResponse] = await Promise.all([
                 fetch(`${API_BASE_URL}/tasks`, {
@@ -67,9 +70,51 @@ function TaskTable() {
         }
     }, [token]);
 
+    const fetchTeamMembers = useCallback(async (projectId) => {
+        if (!projectId) {
+            setTeamMembers([]);
+            return;
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/${projectId}/team`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            });
+            if (!response.ok) throw new Error(`Team members fetch failed: ${response.status}`);
+            const teamMembersData = await response.json();
+            if (teamMembersData && Array.isArray(teamMembersData.team_members)) {
+                    setTeamMembers(
+                    teamMembersData.team_members.filter(member => member.status === 'accepted')
+                    );
+                } else {
+                    setTeamMembers([]); // fallback in case data is malformed
+                }
+            } catch (e) {
+            console.error("Failed to fetch team members:", e);
+            setError(`Failed to load team members: ${e.message}`);
+            setTeamMembers([]);
+        }
+    }, [token]);
+
     useEffect(() => {
         fetchData();
+        const intervalId = setInterval(() => {
+            fetchData();
+        }, 60000);
+        return () => clearInterval(intervalId);
     }, [fetchData]);
+
+    useEffect(() => {
+        if (formData.project_id) {
+            fetchTeamMembers(formData.project_id);
+        } else {
+            setTeamMembers([]);
+        }
+    }, [formData.project_id, fetchTeamMembers]);
 
     const handleShowCreateModal = () => {
         if (projects.length === 0) {
@@ -84,29 +129,34 @@ function TaskTable() {
             description: '',
             status: 'pending',
             priority: 'medium',
-            budget: '',
-            assigned_user_id: '', 
+            assigned_user_id: '',
             start_time: '',
             end_time: '',
         });
-        setApiError(null); // Clear any API errors
-        setError(null); // Clear any form errors
+        setApiError(null);
+        setError(null);
         setShowModal(true);
     };
 
     const handleShowEditModal = (task) => {
         setIsEditing(true);
         setCurrentTask(task);
-        setApiError(null); // Clear any API errors
-        setError(null); // Clear any form errors
+        setApiError(null);
+        setError(null);
         
-        // Extract time log information if available
         let startTime = '';
         let endTime = '';
         
         if (task.time_logs) {
-            startTime = task.time_logs.start_time ? task.time_logs.start_time.split('T')[0] : '';
-            endTime = task.time_logs.end_time ? task.time_logs.end_time.split('T')[0] : '';
+            startTime = task.time_logs.start_time ? task.time_logs.start_time.split('.')[0] : '';
+            endTime = task.time_logs.end_time ? task.time_logs.end_time.split('.')[0] : '';
+        }
+        
+        if (startTime && !startTime.includes('T')) {
+            startTime = startTime.replace(' ', 'T');
+        }
+        if (endTime && !endTime.includes('T')) {
+            endTime = endTime.replace(' ', 'T');
         }
         
         setFormData({
@@ -115,7 +165,6 @@ function TaskTable() {
             description: task.description || '',
             status: task.status,
             priority: task.priority,
-            budget: task.budget,
             assigned_user_id: task.assigned_user_id || '',
             start_time: startTime,
             end_time: endTime,
@@ -123,11 +172,22 @@ function TaskTable() {
         setShowModal(true);
     };
 
+    const handleShowCommentsModal = (taskId) => {
+        setCurrentTaskId(taskId);
+        setShowCommentsModal(true);
+    };
+
     const handleCloseModal = () => {
         setShowModal(false);
         setCurrentTask(null);
         setError(null);
-        setApiError(null); // Clear API errors when closing modal
+        setApiError(null);
+        setTeamMembers([]);
+    };
+
+    const handleCloseCommentsModal = () => {
+        setShowCommentsModal(false);
+        setCurrentTaskId(null);
     };
 
     const handleInputChange = (e) => {
@@ -136,12 +196,63 @@ function TaskTable() {
             ...prev,
             [name]: value
         }));
+        
+        if (name === 'project_id') {
+            setFormData(prev => ({ ...prev, assigned_user_id: '' }));
+        }
+        
+        if (name === 'start_time' || name === 'end_time') {
+            updateStatusPreview();
+        }
     };
+    
+    const [statusPreview, setStatusPreview] = useState(null);
+    
+    const updateStatusPreview = () => {
+        if (!formData.start_time && !formData.end_time) {
+            setStatusPreview(null);
+            return;
+        }
+        
+        const now = new Date();
+        const startTime = formData.start_time ? new Date(formData.start_time) : null;
+        const endTime = formData.end_time ? new Date(formData.end_time) : null;
+        
+        let computedStatus = formData.status;
+        
+        if (startTime && endTime) {
+            if (now < startTime) {
+                computedStatus = 'pending';
+            } else if (now > endTime) {
+                computedStatus = 'completed';
+            } else {
+                computedStatus = 'in progress';
+            }
+        } else if (startTime && !endTime) {
+            if (now < startTime) {
+                computedStatus = 'pending';
+            } else {
+                computedStatus = 'in progress';
+            }
+        } else if (!startTime && endTime) {
+            if (now > endTime) {
+                computedStatus = 'completed';
+            } else {
+                computedStatus = 'in progress';
+            }
+        }
+        
+        setStatusPreview(computedStatus);
+    };
+    
+    useEffect(() => {
+        updateStatusPreview();
+    }, [formData.start_time, formData.end_time]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
-        setApiError(null); // Clear any previous API errors
+        setApiError(null);
     
         const url = isEditing
             ? `${API_BASE_URL}/tasks/${currentTask.id}`
@@ -157,7 +268,6 @@ function TaskTable() {
             return;
         }
         
-        // Validate start and end times if both are provided
         if (formData.start_time && formData.end_time) {
             if (new Date(formData.start_time) > new Date(formData.end_time)) {
                 setError("Start time cannot be after end time.");
@@ -168,20 +278,20 @@ function TaskTable() {
         let payload = { ...formData };
         payload.assigned_user_id = formData.assigned_user_id === '' ? null : formData.assigned_user_id;
         
-        // Include time log data if provided
         if (formData.start_time || formData.end_time) {
             payload.time_logs = {
                 start_time: formData.start_time || null,
                 end_time: formData.end_time || null,
                 user_id: formData.assigned_user_id || null
             };
+            
+            if (statusPreview) {
+                payload.status = statusPreview;
+            }
         }
         
-        // Remove the direct time fields from the payload
         delete payload.start_time;
         delete payload.end_time;
-    
-        console.log("Payload to be sent:", JSON.stringify(payload, null, 2));
     
         try {
             const response = await fetch(url, {
@@ -197,22 +307,20 @@ function TaskTable() {
             const data = await response.json();
             
             if (!response.ok) {
-                // Handle standard Laravel validation errors
                 if (data.errors) {
                     const messages = Object.values(data.errors).flat().join(' ');
                     throw new Error(messages);
                 }
                 
-                // Handle custom API messages like budget exceeded error
                 if (data.message) {
                     setApiError(data.message);
-                    return; // Don't throw error, just display the message
+                    return;
                 }
                 
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
     
-            fetchData(); // Refresh list
+            fetchData();
             handleCloseModal();
     
         } catch (e) {
@@ -234,14 +342,12 @@ function TaskTable() {
                     },
                 });
                 
-                // Check if there's a response body
                 let data = null;
                 if (response.headers.get('Content-Type')?.includes('application/json')) {
                     data = await response.json();
                 }
                 
                 if (!response.ok && response.status !== 204) {
-                    // If there's an error message from the server, display it
                     if (data && data.message) {
                         setApiError(data.message);
                         return;
@@ -249,7 +355,7 @@ function TaskTable() {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
-                fetchData(); // Refresh list
+                fetchData();
             } catch (e) {
                 console.error("Failed to delete task:", e);
                 setError('Failed to delete task. Please try again.');
@@ -257,24 +363,71 @@ function TaskTable() {
         }
     };
 
-    const formatCurrency = (amount) => {
-        if (!amount && amount !== 0) return 'N/A';
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'PHP'
-        }).format(amount);
-    };
-
-    // Function to calculate time spent on task
     const getTimeSpent = (task) => {
         if (!task.time_logs || !task.time_logs?.hours_spent) return 'Not tracked';
         return task.time_logs?.hours_spent + ' hrs';
     };
+    
+    const getTaskStatus = (task) => {
+        if (task.computed_status && task.computed_status !== task.status) {
+            return (
+                <>
+                    <Badge bg={getTaskStatusColor(task.computed_status)}>
+                        {task.computed_status} <span title="Status automatically computed from time logs"></span>
+                    </Badge>
+                </>
+            );
+        }
+        
+        if (task.time_logs) {
+            const now = new Date();
+            const startTime = task.time_logs.start_time ? new Date(task.time_logs.start_time) : null;
+            const endTime = task.time_logs.end_time ? new Date(task.time_logs.end_time) : null;
+            
+            let computedStatus = task.status;
+            let isComputed = false;
+            
+            if (startTime && endTime) {
+                isComputed = true;
+                if (now < startTime) {
+                    computedStatus = 'pending';
+                } else if (now > endTime) {
+                    computedStatus = 'completed';
+                } else {
+                    computedStatus = 'in progress';
+                }
+            } else if (startTime && !endTime) {
+                isComputed = true;
+                if (now < startTime) {
+                    computedStatus = 'pending';
+                } else {
+                    computedStatus = 'in progress';
+                }
+            } else if (!startTime && endTime) {
+                isComputed = true;
+                if (now > endTime) {
+                    computedStatus = 'completed';
+                } else {
+                    computedStatus = 'in progress';
+                }
+            }
+            
+            if (isComputed && computedStatus !== task.status) {
+                return (
+                    <>
+                        <Badge bg={getTaskStatusColor(computedStatus)}>
+                            {computedStatus} <span title="Status automatically computed from time logs"></span>
+                        </Badge>
+                    </>
+                );
+            }
+        }
+        
+        return <Badge bg={getTaskStatusColor(task.status)}>{task.status}</Badge>;
+    };
 
-    // --- Render Logic ---
     if (loading) return <div className="text-center">Loading Tasks, Projects, and Users...</div>;
     
-    // Display API-specific errors at the top level if they exist and we're not in the modal
     if (apiError && !showModal) {
         return (
             <div>
@@ -317,7 +470,6 @@ function TaskTable() {
                                 <th>Project</th>
                                 <th>Status</th>
                                 <th>Priority</th>
-                                <th>Budget</th>
                                 <th>Time Frame</th>
                                 <th>Time Spent</th>
                                 <th>Assignee</th>
@@ -335,19 +487,27 @@ function TaskTable() {
                                     <tr key={task.id}>
                                         <td>{task.title}</td>
                                         <td>{task.project?.name || 'N/A'}</td>
-                                        <td><Badge bg={getTaskStatusColor(task.status)}>{task.status}</Badge></td>
+                                        <td>{getTaskStatus(task)}</td>
                                         <td><Badge bg={getTaskPriorityColor(task.priority)}>{task.priority}</Badge></td>
-                                        <td>{formatCurrency(task.budget)}</td>
                                         <td>{timeFrame}</td>
                                         <td>{getTimeSpent(task)}</td>
                                         <td>{task.assigned_user?.name || 'Unassigned'}</td>
                                         <td>
-                                            <Button variant="outline-secondary" size="sm" onClick={() => handleShowEditModal(task)} className="me-2">
-                                                Edit
-                                            </Button>
-                                            <Button variant="outline-danger" size="sm" onClick={() => handleDelete(task.id)}>
-                                                Delete
-                                            </Button>
+                                            <div className="d-flex">
+                                                {(task.created_by === user?.id || task.assigned_user_id === user?.id) && (
+                                                    <>
+                                                        <Button variant="outline-secondary" size="sm" onClick={() => handleShowEditModal(task)} className="me-1">
+                                                            Edit
+                                                        </Button>
+                                                        <Button variant="outline-danger" size="sm" onClick={() => handleDelete(task.id)} className="me-1">
+                                                            Delete
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                <Button variant="outline-info" size="sm" onClick={() => handleShowCommentsModal(task.id)}>
+                                                    Comments
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -362,14 +522,12 @@ function TaskTable() {
                     </Modal.Header>
                     <Form onSubmit={handleSubmit}>
                         <Modal.Body>
-                            {/* Display form validation errors */}
                             {error && (
                                 <Alert variant="danger" dismissible onClose={() => setError(null)}>
                                     {error}
                                 </Alert>
                             )}
                             
-                            {/* Display API-specific errors */}
                             {apiError && (
                                 <Alert variant="warning" dismissible onClose={() => setApiError(null)}>
                                     <Alert.Heading>Server Message</Alert.Heading>
@@ -392,11 +550,58 @@ function TaskTable() {
                                 <Form.Label>Description</Form.Label>
                                 <Form.Control as="textarea" name="description" rows={3} value={formData.description} onChange={handleInputChange} placeholder="Enter task description (optional)" />
                             </Form.Group>
+                            
+                            <Card className="mb-3 border-info">
+                                <Card.Header className="bg-info bg-opacity-10">
+                                    <strong>Time Frame</strong> - Affects Task Status
+                                </Card.Header>
+                                <Card.Body>
+                                    <Form.Group className="mb-3" controlId="taskStartTime">
+                                        <Form.Label>Start Date</Form.Label>
+                                        <Form.Control 
+                                            type="datetime-local" 
+                                            name="start_time" 
+                                            value={formData.start_time} 
+                                            onChange={handleInputChange} 
+                                            placeholder="Select start date and time"
+                                        />
+                                    </Form.Group>
+                                    <Form.Group className="mb-3" controlId="taskEndTime">
+                                        <Form.Label>End Date</Form.Label>
+                                        <Form.Control 
+                                            type="datetime-local" 
+                                            name="end_time" 
+                                            value={formData.end_time} 
+                                            onChange={handleInputChange} 
+                                            placeholder="Select end date and time"
+                                        />
+                                    </Form.Group>
+                                    
+                                    {statusPreview && (
+                                        <Alert variant="info" className="mb-0">
+                                            <small>
+                                                Based on the time frame, this task will automatically be set to <Badge bg={getTaskStatusColor(statusPreview)}>{statusPreview}</Badge> status
+                                            </small>
+                                        </Alert>
+                                    )}
+                                </Card.Body>
+                            </Card>
+                            
                             <Form.Group className="mb-3" controlId="taskStatus">
                                 <Form.Label>Status</Form.Label>
-                                <Form.Select name="status" value={formData.status} onChange={handleInputChange}>
+                                <Form.Select 
+                                    name="status" 
+                                    value={statusPreview || formData.status} 
+                                    onChange={handleInputChange}
+                                    disabled
+                                >
                                     {taskStatuses.map(status => <option key={status} value={status}>{status}</option>)}
                                 </Form.Select>
+                                {statusPreview !== null && (
+                                    <Form.Text className="text-muted">
+                                        Status is determined by the time frame. Clear dates to set manually.
+                                    </Form.Text>
+                                )}
                             </Form.Group>
                             <Form.Group className="mb-3" controlId="taskPriority">
                                 <Form.Label>Priority</Form.Label>
@@ -404,48 +609,20 @@ function TaskTable() {
                                     {taskPriorities.map(priority => <option key={priority} value={priority}>{priority}</option>)}
                                 </Form.Select>
                             </Form.Group>
-                            <Form.Group className="mb-3" controlId="taskBudget">
-                                <Form.Label>Budget <span className="text-danger">*</span></Form.Label>
-                                <Form.Control
-                                    type="number"
-                                    name="budget"
-                                    value={formData.budget}
-                                    onChange={handleInputChange}
-                                    placeholder="Enter project budget (optional)"
-                                    min="0"
-                                    step="0.01" />
-                                <Form.Text className="text-muted">
-                                    Note: Task budget cannot exceed available project budget.
-                                </Form.Text>
-                            </Form.Group>
-                            <Form.Group className="mb-3" controlId="taskStartTime">
-                                <Form.Label>Start Date</Form.Label>
-                                <Form.Control 
-                                    type="datetime-local" 
-                                    name="start_time" 
-                                    value={formData.start_time} 
-                                    onChange={handleInputChange} 
-                                    placeholder="Select start date and time"
-                                />
-                            </Form.Group>
-                            <Form.Group className="mb-3" controlId="taskEndTime">
-                                <Form.Label>End Date</Form.Label>
-                                <Form.Control 
-                                    type="datetime-local" 
-                                    name="end_time" 
-                                    value={formData.end_time} 
-                                    onChange={handleInputChange} 
-                                    placeholder="Select end date and time"
-                                />
-                                <Form.Text className="text-muted">
-                                    Both start and end dates are used for time tracking.
-                                </Form.Text>
-                            </Form.Group>
                             <Form.Group className="mb-3" controlId="taskAssignee">
                                 <Form.Label>Assignee</Form.Label>
                                 <Form.Select name="assigned_user_id" value={formData.assigned_user_id} onChange={handleInputChange}>
                                     <option value="">Unassigned</option>
-                                    {users.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+                                    {teamMembers.map(member => (
+                                        <option key={member.user_id} value={member.user_id}>
+                                            {member.user?.name || 'Unknown'}
+                                        </option>
+                                    ))}
+                                    {isEditing && formData.assigned_user_id && !teamMembers.find(m => m.user_id === formData.assigned_user_id) && (
+                                        <option value={formData.assigned_user_id}>
+                                            {currentTask?.assigned_user?.name || 'Current Assignee'}
+                                        </option>
+                                    )}
                                 </Form.Select>
                             </Form.Group>
                         </Modal.Body>
@@ -454,6 +631,18 @@ function TaskTable() {
                             <Button variant="primary" type="submit">{isEditing ? 'Save Changes' : 'Create Task'}</Button>
                         </Modal.Footer>
                     </Form>
+                </Modal>
+
+                <Modal show={showCommentsModal} onHide={handleCloseCommentsModal}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>Task Comments</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {currentTaskId && <TaskComments taskId={currentTaskId} />}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={handleCloseCommentsModal}>Close</Button>
+                    </Modal.Footer>
                 </Modal>
             </div>
         );

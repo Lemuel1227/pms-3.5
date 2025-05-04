@@ -12,15 +12,18 @@ class ProjectController extends Controller
 {
     public function index()
     {
-        // $projects = Project::where('created_by', auth('sanctum')->id())->orWhereHas('members', function($q) { // Assuming a members relationship later
-        //     $q->where('user_id', auth('sanctum')->id());
-        // })->with('owner')->latest()->get();
-
-        $projects = Project::where('created_by', auth('sanctum')->id())->with('owner')->latest()->get();
+        $userId = auth('sanctum')->id();
+        
+        $projects = Project::where('created_by', $userId)->with('owner')
+            ->orWhereHas('teamMembers', function ($query) use ($userId) {
+                $query->where('user_id', $userId)
+                      ->where('status', 'accepted');
+            })
+            ->latest()
+            ->get();
 
         return response()->json($projects);
     }
-
 
     public function store(Request $request)
     {
@@ -31,23 +34,29 @@ class ProjectController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => [
                 'nullable',
-                Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed']), 
+                Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed']),
             ],
             'budget' => 'nullable|numeric|min:0',
         ]);
 
         $validatedData['created_by'] = auth('sanctum')->id();
-
         $validatedData['status'] = $validatedData['status'] ?? 'Not Started';
 
         $project = Project::create($validatedData);
 
-        return response()->json($project->load('owner'), 201); 
+        return response()->json($project->load('owner'), 201);
     }
 
     public function show(Project $project)
     {
-        if (auth('sanctum')->id() !== $project->created_by /* && !user is member etc. */) {
+        $userId = auth('sanctum')->id();
+
+        $isAcceptedMember = $project->teamMembers()
+            ->where('user_id', $userId)
+            ->where('status', 'accepted')
+            ->exists();
+
+        if ($userId !== $project->created_by && !$isAcceptedMember) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
@@ -56,23 +65,30 @@ class ProjectController extends Controller
 
     public function update(Request $request, Project $project)
     {
-         if (auth('sanctum')->id() !== $project->created_by) {
-             return response()->json(['message' => 'Forbidden'], 403);
-         }
+        $userId = auth('sanctum')->id();
+
+        $isAcceptedMember = $project->teamMembers()
+            ->where('user_id', $userId)
+            ->where('status', 'accepted')
+            ->exists();
+
+        if ($userId !== $project->created_by && !$isAcceptedMember) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         $validatedData = $request->validate([
-            'name' => 'sometimes|required|string|max:255', 
+            'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => [
                 'sometimes',
                 'required',
-                Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed']), 
+                Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed']),
             ],
             'budget' => 'nullable|numeric|min:0',
         ]);
-        
+
         $project->update($validatedData);
 
         return response()->json($project->load('owner'));
@@ -80,19 +96,19 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
-        if (auth('sanctum')->id() !== $project->created_by) {
+        $userId = auth('sanctum')->id();
+
+        $isAcceptedMember = $project->teamMembers()
+            ->where('user_id', $userId)
+            ->where('status', 'accepted')
+            ->exists();
+
+        if ($userId !== $project->created_by && !$isAcceptedMember) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $project->delete(); 
+        $project->delete();
 
-        return response()->json(null, 204); 
+        return response()->json(null, 204);
     }
-    
-    /**
-     * Get budget summary for a project
-     * 
-     * @param Project $project
-     * @return \Illuminate\Http\JsonResponse
-     */
 }

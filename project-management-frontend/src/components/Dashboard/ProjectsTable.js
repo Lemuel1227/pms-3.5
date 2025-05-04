@@ -1,34 +1,58 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '../../context/AuthContext'; 
+import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../App';
-import { Modal, Button, Form, Nav, Tab } from 'react-bootstrap'; 
+import { Modal, Button, Form, Nav, Tab, Alert } from 'react-bootstrap';
 import { Gantt, ViewMode } from 'gantt-task-react';
 import 'gantt-task-react/dist/index.css';
+import TeamMembers from './TeamMembers';
+import Budgets from './Budgets';
 
 function ProjectTable() {
     const { token } = useAuth();
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-
+    const [user, setUser] = useState(null);
     const [showModal, setShowModal] = useState(false);
     const [showTasksModal, setShowTasksModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [currentProject, setCurrentProject] = useState(null);
     const [projectTasks, setProjectTasks] = useState([]);
+    const [projectBudgets, setProjectBudgets] = useState([]);
     const [tasksLoading, setTasksLoading] = useState(false);
     const [tasksError, setTasksError] = useState(null);
-    const [totalBudgetUsed, setTotalBudgetUsed] = useState(0);
+    const [statusPreview, setStatusPreview] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
         description: '',
         start_date: '',
         end_date: '',
         status: 'Not Started',
-        budget: '', 
+        budget: '',
     });
 
     const projectStatuses = ['Not Started', 'In Progress', 'On Hold', 'Completed'];
+
+    const fetchUser = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/user`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json',
+                },
+            });
+            if (!response.ok) throw new Error('Failed to fetch user');
+            const data = await response.json();
+            setUser(data);
+        } catch (e) {
+            console.error('Failed to fetch user:', e);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        fetchUser();
+    }, [fetchUser]);
 
     const fetchProjects = useCallback(async () => {
         setLoading(true);
@@ -58,28 +82,38 @@ function ProjectTable() {
         setTasksLoading(true);
         setTasksError(null);
         try {
-            const response = await fetch(`${API_BASE_URL}/projects/${projectId}/tasks`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Accept': 'application/json',
-                },
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);  
+            const [tasksResponse, budgetsResponse] = await Promise.all([
+                fetch(`${API_BASE_URL}/projects/${projectId}/tasks`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    },
+                }),
+                fetch(`${API_BASE_URL}/projects/${projectId}/budgets`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json',
+                    },
+                }),
+            ]);
+
+            if (!tasksResponse.ok) {
+                const errorData = await tasksResponse.json();
+                throw new Error(errorData.message || `Tasks fetch failed: ${tasksResponse.status}`);
             }
-            const data = await response.json();
-            setProjectTasks(data);
-            
-            // Calculate total budget used by tasks
-            const budgetUsed = data.reduce((total, task) => {
-                return total + (parseFloat(task.budget) || 0);
-            }, 0);
-            setTotalBudgetUsed(budgetUsed);
-            
+            if (!budgetsResponse.ok) {
+                const errorData = await budgetsResponse.json();
+                throw new Error(errorData.message || `Budgets fetch failed: ${budgetsResponse.status}`);
+            }
+
+            const tasksData = await tasksResponse.json();
+            const budgetsData = await budgetsResponse.json();
+
+            setProjectTasks(tasksData);
+            setProjectBudgets(budgetsData);
         } catch (e) {
-            console.error("Failed to fetch project tasks:", e);
-            setTasksError('Failed to load tasks. Please try again later.');
+            console.error("Failed to fetch project tasks or budgets:", e);
+            setTasksError(`Failed to load tasks or budgets: ${e.message}`);
         } finally {
             setTasksLoading(false);
         }
@@ -87,6 +121,10 @@ function ProjectTable() {
 
     useEffect(() => {
         fetchProjects();
+        const intervalId = setInterval(() => {
+            fetchProjects();
+        }, 60000);
+        return () => clearInterval(intervalId);
     }, [fetchProjects]);
 
     const handleShowCreateModal = () => {
@@ -98,8 +136,9 @@ function ProjectTable() {
             start_date: '',
             end_date: '',
             status: 'Not Started',
-            budget: '', 
+            budget: '',
         });
+        setStatusPreview(null);
         setShowModal(true);
     };
 
@@ -112,7 +151,11 @@ function ProjectTable() {
             start_date: project.start_date ? project.start_date.split('T')[0] : '',
             end_date: project.end_date ? project.end_date.split('T')[0] : '',
             status: project.status,
-            budget: project.budget || '', 
+            budget: project.budget || '',
+        });
+        updateStatusPreview({
+            start_date: project.start_date ? project.start_date.split('T')[0] : '',
+            end_date: project.end_date ? project.end_date.split('T')[0] : '',
         });
         setShowModal(true);
     };
@@ -125,65 +168,108 @@ function ProjectTable() {
 
     const handleCloseModal = () => {
         setShowModal(false);
-        setCurrentProject(null); 
-        setError(null); 
+        setCurrentProject(null);
+        setError(null);
+        setStatusPreview(null);
     };
 
     const handleCloseTasksModal = () => {
         setShowTasksModal(false);
         setProjectTasks([]);
+        setProjectBudgets([]);
         setCurrentProject(null);
-        setTotalBudgetUsed(0);
     };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'start_date' || name === 'end_date') {
+            updateStatusPreview({
+                ...formData,
+                [name]: value,
+            });
+        }
     };
+
+    const updateStatusPreview = (data) => {
+        const dateData = data || formData;
+        if (!dateData.start_date && !dateData.end_date) {
+            setStatusPreview(null);
+            return;
+        }
+        const now = new Date();
+        const startDate = dateData.start_date ? new Date(dateData.start_date) : null;
+        const endDate = dateData.end_date ? new Date(dateData.end_date) : null;
+        let computedStatus = dateData.status;
+        if (startDate && endDate) {
+            if (now < startDate) {
+                computedStatus = 'Not Started';
+            } else if (now > endDate) {
+                computedStatus = 'Completed';
+            } else {
+                computedStatus = 'In Progress';
+            }
+        } else if (startDate && !endDate) {
+            if (now < startDate) {
+                computedStatus = 'Not Started';
+            } else {
+                computedStatus = 'In Progress';
+            }
+        } else if (!startDate && endDate) {
+            if (now > endDate) {
+                computedStatus = 'Completed';
+            } else {
+                computedStatus = 'In Progress';
+            }
+        }
+        setStatusPreview(computedStatus);
+    };
+
+    useEffect(() => {
+        updateStatusPreview();
+    }, [formData.start_date, formData.end_date]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null); 
-
+        setError(null);
         const url = isEditing
             ? `${API_BASE_URL}/projects/${currentProject.id}`
             : `${API_BASE_URL}/projects`;
         const method = isEditing ? 'PUT' : 'POST';
-
         if (!formData.name.trim()) {
-            setError("Project name cannot be empty.");
+            setError('Project name cannot be empty.');
             return;
         }
         if (formData.end_date && formData.start_date && formData.end_date < formData.start_date) {
-            setError("End date cannot be before start date.");
+            setError('End date cannot be before start date.');
             return;
         }
         if (formData.budget && isNaN(parseFloat(formData.budget))) {
-            setError("Budget must be a valid number.");
+            setError('Budget must be a valid number.');
             return;
         }
-
+        const payload = { ...formData };
+        if (statusPreview) {
+            payload.status = statusPreview;
+        }
         try {
             const response = await fetch(url, {
-                method: method,
+                method,
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(payload),
             });
-
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
-
             fetchProjects();
             handleCloseModal();
-
         } catch (e) {
-            console.error("Failed to save project:", e);
+            console.error('Failed to save project:', e);
             setError(`Failed to save project: ${e.message}`);
         }
     };
@@ -199,37 +285,31 @@ function ProjectTable() {
                         'Accept': 'application/json',
                     },
                 });
-
-                if (!response.ok && response.status !== 204) { 
-                     throw new Error(`HTTP error! status: ${response.status}`);
-                 }
-
+                if (!response.ok && response.status !== 204) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 fetchProjects();
-
             } catch (e) {
-                console.error("Failed to delete project:", e);
+                console.error('Failed to delete project:', e);
                 setError('Failed to delete project. Please try again.');
             }
         }
     };
 
-    // Format currency for display
     const formatCurrency = (amount) => {
         if (!amount && amount !== 0) return 'N/A';
         return new Intl.NumberFormat('en-US', {
             style: 'currency',
-            currency: 'PHP'
+            currency: 'PHP',
         }).format(amount);
     };
 
-    // Calculate remaining budget
     const getRemainingBudget = () => {
         if (!currentProject || !currentProject.budget) return null;
-        const projectBudget = parseFloat(currentProject.budget) || 0;
-        return projectBudget - totalBudgetUsed;
+        const totalUsed = projectBudgets.reduce((sum, budget) => sum + parseFloat(budget.amount), 0);
+        return parseFloat(currentProject.budget) - totalUsed;
     };
 
-    // Convert tasks to Gantt chart format
     const ganttTasks = projectTasks.map(task => ({
         id: task.id.toString(),
         name: task.title,
@@ -237,8 +317,19 @@ function ProjectTable() {
         end: new Date(task.time_logs?.end_time || new Date()),
         progress: 100,
         type: 'task',
-        styles: { progressColor: getTaskStatusColor(task.status), progressSelectedColor: getTaskStatusColor(task.status) }
+        styles: { progressColor: getTaskStatusColor(task.status), progressSelectedColor: getTaskStatusColor(task.status) },
     }));
+
+    const getProjectStatusDisplay = (project) => {
+        if (project.computed_status && project.computed_status !== project.status) {
+            return (
+                <span className={`badge bg-${getStatusColor(project.computed_status)}`}>
+                    {project.computed_status} <span title="Status automatically computed from timeline"></span>
+                </span>
+            );
+        }
+        return <span className={`badge bg-${getStatusColor(project.status)}`}>{project.status}</span>;
+    };
 
     if (loading) return <div className="text-center">Loading Projects...</div>;
     if (error && !showModal) return <div className="alert alert-danger">{error}</div>;
@@ -270,20 +361,38 @@ function ProjectTable() {
                             <tr key={project.id}>
                                 <td>{project.name}</td>
                                 <td>{project.description?.substring(0, 50)}{project.description?.length > 50 ? '...' : ''}</td>
-                                <td><span className={`badge bg-${getStatusColor(project.status)}`}>{project.status}</span></td>
+                                <td>{getProjectStatusDisplay(project)}</td>
                                 <td>{project.start_date ? new Date(project.start_date).toLocaleDateString() : 'N/A'}</td>
                                 <td>{project.end_date ? new Date(project.end_date).toLocaleDateString() : 'N/A'}</td>
                                 <td>{formatCurrency(project.budget)}</td>
                                 <td>
-                                    <Button variant="outline-primary" size="sm" onClick={() => handleShowTasksModal(project)} className="me-2">
+                                    <Button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        onClick={() => handleShowTasksModal(project)}
+                                        className="me-2"
+                                    >
                                         View Tasks
                                     </Button>
-                                    <Button variant="outline-secondary" size="sm" onClick={() => handleShowEditModal(project)} className="me-2">
-                                        Edit
-                                    </Button>
-                                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(project.id)}>
-                                        Delete
-                                    </Button>
+                                    {project.created_by === user?.id && (
+                                        <>
+                                            <Button
+                                                variant="outline-secondary"
+                                                size="sm"
+                                                onClick={() => handleShowEditModal(project)}
+                                                className="me-2"
+                                            >
+                                                Edit
+                                            </Button>
+                                            <Button
+                                                variant="outline-danger"
+                                                size="sm"
+                                                onClick={() => handleDelete(project.id)}
+                                            >
+                                                Delete
+                                            </Button>
+                                        </>
+                                    )}
                                 </td>
                             </tr>
                         ))}
@@ -291,14 +400,13 @@ function ProjectTable() {
                 </table>
             )}
 
-            {/* Project Edit/Create Modal */}
             <Modal show={showModal} onHide={handleCloseModal} backdrop="static" keyboard={false}>
                 <Modal.Header closeButton>
                     <Modal.Title>{isEditing ? 'Edit Project' : 'Create New Project'}</Modal.Title>
                 </Modal.Header>
                 <Form onSubmit={handleSubmit}>
                     <Modal.Body>
-                        {error && <div className="alert alert-danger">{error}</div>} 
+                        {error && <div className="alert alert-danger">{error}</div>}
                         <Form.Group className="mb-3" controlId="projectName">
                             <Form.Label>Project Name <span className="text-danger">*</span></Form.Label>
                             <Form.Control
@@ -321,17 +429,59 @@ function ProjectTable() {
                                 placeholder="Enter project description (optional)"
                             />
                         </Form.Group>
+                        <div className="card mb-3 border-info">
+                            <div className="card-header bg-info bg-opacity-10">
+                                <strong>Timeline</strong> - Affects Project Status
+                            </div>
+                            <div className="card-body">
+                                <Form.Group className="mb-3" controlId="projectStartDate">
+                                    <Form.Label>Start Date</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        name="start_date"
+                                        value={formData.start_date}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
+                                </Form.Group>
+                                <Form.Group className="mb-3" controlId="projectEndDate">
+                                    <Form.Label>End Date</Form.Label>
+                                    <Form.Control
+                                        type="date"
+                                        name="end_date"
+                                        value={formData.end_date}
+                                        onChange={handleInputChange}
+                                        min={formData.start_date || undefined}
+                                        required
+                                    />
+                                </Form.Group>
+                                {statusPreview && (
+                                    <Alert variant="info" className="mb-0">
+                                        <small>
+                                            Based on the timeline, this project will automatically be set to{' '}
+                                            <span className={`badge bg-${getStatusColor(statusPreview)}`}>{statusPreview}</span> status
+                                        </small>
+                                    </Alert>
+                                )}
+                            </div>
+                        </div>
                         <Form.Group className="mb-3" controlId="projectStatus">
                             <Form.Label>Status</Form.Label>
                             <Form.Select
                                 name="status"
-                                value={formData.status}
+                                value={statusPreview || formData.status}
                                 onChange={handleInputChange}
+                                disabled
                             >
                                 {projectStatuses.map(status => (
                                     <option key={status} value={status}>{status}</option>
                                 ))}
                             </Form.Select>
+                            {statusPreview !== null && (
+                                <Form.Text className="text-muted">
+                                    Status is determined by the timeline. Clear dates to set manually.
+                                </Form.Text>
+                            )}
                         </Form.Group>
                         <Form.Group className="mb-3" controlId="projectBudget">
                             <Form.Label>Budget (₱)</Form.Label>
@@ -343,25 +493,6 @@ function ProjectTable() {
                                 placeholder="Enter project budget (optional)"
                                 min="0"
                                 step="0.01"
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3" controlId="projectStartDate">
-                            <Form.Label>Start Date</Form.Label>
-                            <Form.Control
-                                type="date"
-                                name="start_date"
-                                value={formData.start_date}
-                                onChange={handleInputChange}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3" controlId="projectEndDate">
-                            <Form.Label>End Date</Form.Label>
-                            <Form.Control
-                                type="date"
-                                name="end_date"
-                                value={formData.end_date}
-                                onChange={handleInputChange}
-                                min={formData.start_date || undefined} 
                             />
                         </Form.Group>
                     </Modal.Body>
@@ -376,19 +507,11 @@ function ProjectTable() {
                 </Form>
             </Modal>
 
-            {/* Project Tasks Modal */}
-            <Modal 
-                show={showTasksModal} 
-                onHide={handleCloseTasksModal} 
-                size="xl" 
-                backdrop="static" 
-                keyboard={false}
-            >
+            <Modal show={showTasksModal} onHide={handleCloseTasksModal} size="xl" backdrop="static" keyboard={false}>
                 <Modal.Header closeButton>
                     <Modal.Title>Tasks for {currentProject?.name}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
-                    {/* Budget Summary Section */}
                     {currentProject && currentProject.budget && (
                         <div className="card mb-4">
                             <div className="card-body">
@@ -401,14 +524,15 @@ function ProjectTable() {
                                     </div>
                                     <div className="col-md-4">
                                         <div className="mb-2">
-                                            <strong>Budget Used:</strong> {formatCurrency(totalBudgetUsed)}
+                                            <strong>Budget Used:</strong>{' '}
+                                            {formatCurrency(projectBudgets.reduce((sum, budget) => sum + parseFloat(budget.amount), 0))}
                                         </div>
                                     </div>
                                     <div className="col-md-4">
                                         <div className="mb-2">
-                                            <strong>Remaining Budget:</strong> 
-                                            <span className={parseFloat(getRemainingBudget()) < 0 ? "text-danger" : "text-success"}>
-                                                {" "}{formatCurrency(getRemainingBudget())}
+                                            <strong>Remaining Budget:</strong>{' '}
+                                            <span className={parseFloat(getRemainingBudget()) < 0 ? 'text-danger' : 'text-success'}>
+                                                {formatCurrency(getRemainingBudget())}
                                             </span>
                                         </div>
                                     </div>
@@ -430,14 +554,20 @@ function ProjectTable() {
                             <Nav.Item>
                                 <Nav.Link eventKey="gantt">Gantt Chart</Nav.Link>
                             </Nav.Item>
+                            <Nav.Item>
+                                <Nav.Link eventKey="team">Team Members</Nav.Link>
+                            </Nav.Item>
+                            <Nav.Item>
+                                <Nav.Link eventKey="budgets">Budgets</Nav.Link>
+                            </Nav.Item>
                         </Nav>
                         <Tab.Content>
                             <Tab.Pane eventKey="list">
                                 {tasksLoading && <div className="text-center">Loading tasks...</div>}
                                 {tasksError && <div className="alert alert-danger">{tasksError}</div>}
-                                {!tasksLoading && !tasksError && projectTasks.length === 0 && 
+                                {!tasksLoading && !tasksError && projectTasks.length === 0 && (
                                     <div className="text-center">No tasks found for this project.</div>
-                                }
+                                )}
                                 {!tasksLoading && !tasksError && projectTasks.length > 0 && (
                                     <table className="table table-striped">
                                         <thead>
@@ -447,7 +577,6 @@ function ProjectTable() {
                                                 <th>Priority</th>
                                                 <th>Assigned To</th>
                                                 <th>Due Date</th>
-                                                <th>Budget</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -460,9 +589,8 @@ function ProjectTable() {
                                                         </span>
                                                     </td>
                                                     <td>{task.priority}</td>
-                                                    <td>{task.assigned_to?.name || 'Unassigned'}</td>
+                                                    <td>{task.assigned_user?.name || 'Unassigned'}</td>
                                                     <td>{task.due_date ? new Date(task.due_date).toLocaleDateString() : 'No due date'}</td>
-                                                    <td>{formatCurrency(task.budget)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -472,16 +600,26 @@ function ProjectTable() {
                             <Tab.Pane eventKey="gantt">
                                 {tasksLoading && <div className="text-center">Loading tasks...</div>}
                                 {tasksError && <div className="alert alert-danger">{tasksError}</div>}
-                                {!tasksLoading && !tasksError && projectTasks.length === 0 && 
+                                {!tasksLoading && !tasksError && projectTasks.length === 0 && (
                                     <div className="text-center">No tasks found for this project.</div>
-                                }
+                                )}
                                 {!tasksLoading && !tasksError && projectTasks.length > 0 && (
                                     <div style={{ height: '500px' }}>
-                                        <Gantt
-                                            tasks={ganttTasks}
-                                            viewMode={ViewMode.Day}
-                                        />
+                                        <Gantt tasks={ganttTasks} viewMode={ViewMode.Day} />
                                     </div>
+                                )}
+                            </Tab.Pane>
+                            <Tab.Pane eventKey="team">
+                                {currentProject && <TeamMembers projectId={currentProject.id} token={token} />}
+                            </Tab.Pane>
+                            <Tab.Pane eventKey="budgets">
+                                {currentProject && (
+                                    <Budgets
+                                        projectId={currentProject.id}
+                                        token={token}
+                                        projectBudget={currentProject.budget}
+                                        isOwner={currentProject.created_by === user?.id}
+                                    />
                                 )}
                             </Tab.Pane>
                         </Tab.Content>
@@ -499,21 +637,29 @@ function ProjectTable() {
 
 const getStatusColor = (status) => {
     switch (status) {
-        case 'Not Started': return 'secondary';
-        case 'In Progress': return 'primary';
-        case 'On Hold': return 'warning';
-        case 'Completed': return 'success';
-        default: return 'dark';
+        case 'Not Started':
+            return 'secondary';
+        case 'In Progress':
+            return 'info';
+        case 'On Hold':
+            return 'warning';
+        case 'Completed':
+            return 'success';
+        default:
+            return 'dark';
     }
 };
 
 const getTaskStatusColor = (status) => {
-    switch (status) {
-        case 'Not Started': return 'secondary';
-        case 'In Progress': return 'primary';
-        case 'On Hold': return 'warning';
-        case 'Completed': return 'success';
-        default: return 'dark';
+    switch (status?.toLowerCase()) {
+        case 'pending':
+            return 'secondary';
+        case 'in progress':
+            return 'info';
+        case 'completed':
+            return 'success';
+        default:
+            return 'dark';
     }
 };
 

@@ -1,7 +1,7 @@
 <?php
 
-namespace App\Http\Controllers;
-
+namespace App\Http\Controllers\api;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Task;
 
@@ -17,7 +17,7 @@ class CommentController extends Controller
     
         return response()->json($comment);
     }
-    
+        
     public function index(Task $task) {
         return response()->json($task->comments()->with('user')->get());
     }

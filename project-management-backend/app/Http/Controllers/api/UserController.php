@@ -12,4 +12,9 @@ class UserController extends Controller
         $users = User::select('id', 'name')->get();
         return response()->json($users);
     }
+    
+    public function show()
+    {
+        return response()->json(auth('sanctum')->user());
+    }
 }
