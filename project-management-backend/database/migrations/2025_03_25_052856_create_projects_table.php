@@ -18,6 +18,7 @@ return new class extends Migration
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->enum('status', ['Not Started', 'In Progress', 'On Hold', 'Completed'])->default('Not Started');
+            $table->decimal('budget', 15, 2)->nullable();
 
             $table->foreignId('created_by')
                   ->constrained('users') 

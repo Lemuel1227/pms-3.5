@@ -1,17 +1,16 @@
 import React from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; 
 
 function Dashboard() {
     const { logout } = useAuth();
-    const navigate = useNavigate();
 
     const handleLogout = () => {
         logout();
     };
 
     return (
-        <div>
+        <div>   
             <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
                 <div className="container-fluid">
                     <Link className="navbar-brand" to="/dashboard">Klick Inc. PMS</Link>

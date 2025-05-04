@@ -29,7 +29,6 @@ class ProjectFactory extends Factory
             'start_date' => $startDate->format('Y-m-d'), // Format as date string
             'end_date' => $endDate->format('Y-m-d'),     // Format as date string
             'status' => fake()->randomElement(['Not Started', 'In Progress', 'On Hold', 'Completed']), // Use values from migration
-            'created_by' => User::inRandomOrder()->first()?->id ?? User::factory(),// 'created_by' will be set in the Seeder using relationships
             // 'created_by' => User::factory(), // Or create a new user for each project (less efficient for seeding)
             // 'created_by' => User::inRandomOrder()->first()->id, // Or assign randomly (can fail if no users exist yet)
         ];

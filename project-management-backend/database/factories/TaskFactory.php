@@ -26,7 +26,6 @@ class TaskFactory extends Factory
             'description' => fake()->paragraph(1),
             'status' => fake()->randomElement(['pending', 'in progress', 'completed']), // Use values from migration
             'priority' => fake()->randomElement(['low', 'medium', 'high']),         // Use values from migration
-            'due_date' => fake()->optional(0.7)->dateTimeBetween('now', '+3 months')?->format('Y-m-d'), // 70% chance of having a due date
             // Foreign keys ('project_id', 'created_by', 'assigned_user_id') will be set in the Seeder
             // 'project_id' => Project::factory(), // Avoid creating new projects/users here for seeding efficiency
             // 'created_by' => User::factory(),

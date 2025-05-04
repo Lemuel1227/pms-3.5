@@ -15,12 +15,14 @@ class Project extends Model
         'start_date',
         'end_date',
         'status',
-        'created_by'
+        'created_by',
+        'budget'
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'budget' => 'decimal:2',
     ];
 
 
@@ -33,4 +35,15 @@ class Project extends Model
     {
         return $this->hasMany(Task::class);
     }
+
+    public function timeLog()
+    {
+        return $this->hasManyThrough(TimeLog::class, Task::class);
+    }
+
+    public function remainingBudget()
+    {
+        return $this->budget - $this->tasks()->sum('budget');
+    }
+
 }

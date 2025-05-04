@@ -66,6 +66,11 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Project::class);
     }
+
+    public function timeLogs()
+    {
+        return $this->hasMany(TimeLog::class);
+    }
 }
 
 

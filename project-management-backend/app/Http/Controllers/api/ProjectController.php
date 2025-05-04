@@ -12,7 +12,6 @@ class ProjectController extends Controller
 {
     public function index()
     {
-      
         // $projects = Project::where('created_by', auth('sanctum')->id())->orWhereHas('members', function($q) { // Assuming a members relationship later
         //     $q->where('user_id', auth('sanctum')->id());
         // })->with('owner')->latest()->get();
@@ -30,10 +29,11 @@ class ProjectController extends Controller
             'description' => 'nullable|string',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-             'status' => [
+            'status' => [
                 'nullable',
                 Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed']), 
             ],
+            'budget' => 'nullable|numeric|min:0',
         ]);
 
         $validatedData['created_by'] = auth('sanctum')->id();
@@ -47,31 +47,32 @@ class ProjectController extends Controller
 
     public function show(Project $project)
     {
-         // if (auth('sanctum')->id() !== $project->created_by /* && !user is member etc. */) {
-         //    return response()->json(['message' => 'Forbidden'], 403);
-         // }
+        if (auth('sanctum')->id() !== $project->created_by /* && !user is member etc. */) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         return response()->json($project->load(['tasks', 'owner']));
     }
 
     public function update(Request $request, Project $project)
     {
-         // if (auth('sanctum')->id() !== $project->created_by) {
-         //    return response()->json(['message' => 'Forbidden'], 403);
-         // }
+         if (auth('sanctum')->id() !== $project->created_by) {
+             return response()->json(['message' => 'Forbidden'], 403);
+         }
 
         $validatedData = $request->validate([
             'name' => 'sometimes|required|string|max:255', 
             'description' => 'nullable|string',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
-             'status' => [
+            'status' => [
                 'sometimes',
                 'required',
                 Rule::in(['Not Started', 'In Progress', 'On Hold', 'Completed']), 
             ],
+            'budget' => 'nullable|numeric|min:0',
         ]);
-
+        
         $project->update($validatedData);
 
         return response()->json($project->load('owner'));
@@ -79,12 +80,19 @@ class ProjectController extends Controller
 
     public function destroy(Project $project)
     {
-         // if (auth('sanctum')->id() !== $project->created_by) {
-         //    return response()->json(['message' => 'Forbidden'], 403);
-         // }
+        if (auth('sanctum')->id() !== $project->created_by) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
 
         $project->delete(); 
 
         return response()->json(null, 204); 
     }
+    
+    /**
+     * Get budget summary for a project
+     * 
+     * @param Project $project
+     * @return \Illuminate\Http\JsonResponse
+     */
 }

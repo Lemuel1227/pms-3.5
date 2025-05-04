@@ -21,6 +21,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->enum('status', ['pending', 'in progress', 'completed'])->default('pending');
             $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
+            $table->decimal('budget', 10, 2)->nullable();
 
             $table->foreignId('assigned_user_id')
                 ->nullable() 
@@ -31,13 +32,10 @@ return new class extends Migration
                 ->constrained('users') 
                 ->onDelete('cascade'); 
 
-            $table->date('due_date')->nullable();
-
             $table->timestamps();
 
             $table->index('status');
             $table->index('priority');
-            $table->index('due_date');
         });
     }
 

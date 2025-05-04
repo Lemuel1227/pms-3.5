@@ -6,7 +6,7 @@ import Dashboard from './components/Dashboard/Dashboard'; // Updated Path
 import ProjectTable from './components/Dashboard/ProjectsTable'; // New Import
 import TaskTable from './components/Dashboard/TasksTable';     // New Import
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { BrowserRouter as Router, Route, Routes, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Define API Base URL (Replace with your actual backend URL)

@@ -17,14 +17,32 @@ class Task extends Model
         'priority',    
         'assigned_user_id',  
         'created_by', 
-        'due_date',
+        'time_log',
+        'budget'
     ];
 
     protected $casts = [
-        'due_date' => 'date',
+        'budget' => 'decimal:2',
     ];
+
+    public function save(array $options = [])
+    {
+        $project = $this->project;
+
+        if ($project) {
+            $existingTaskBudgets = $project->tasks()->where('id', '!=', $this->id)->sum('budget');
+            $newTotal = $existingTaskBudgets + ($this->budget ?? 0);
+
+            if ($newTotal > $project->budget) {
+                throw new \Exception('Task budget exceeds project budget.');
+            }
+        }
+
+        return parent::save($options);
+    }
+
     
-   public function owner()
+    public function owner()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
@@ -39,5 +57,8 @@ class Task extends Model
         return $this->belongsTo(User::class, 'assigned_user_id');
     }
 
-    
+    public function timeLogs()
+    {
+        return $this->hasOne(TimeLog::class);
+    }
 }
