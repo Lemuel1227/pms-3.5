@@ -20,7 +20,9 @@ class BudgetController extends Controller
     {
         $userId = auth('sanctum')->id();
 
-        if ($project->created_by !== $userId) {
+        $hasAccess = $project->created_by == $userId || $project->teamMembers->contains('user_id', $userId);
+
+        if (!$hasAccess) {
             return response()->json(['message' => 'Access denied to this project'], 403);
         }
 
@@ -52,6 +54,9 @@ class BudgetController extends Controller
         $currentTotal = $project->budgets()->sum('amount');
         $newTotal = $currentTotal + $validatedData['amount'];
 
+        if (!$project->budget){
+            return response()->json(['message' => 'No Budget allocated for the project'], 422);
+        }
         if ($newTotal > $project->budget) {
             return response()->json(['message' => 'Budget amount exceeds the project\'s remaining budget'], 422);
         }

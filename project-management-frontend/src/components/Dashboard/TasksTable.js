@@ -5,10 +5,9 @@ import { Modal, Button, Alert, Form, Badge, Card } from 'react-bootstrap';
 import TaskComments from './TaskComments';
 
 function TaskTable() {
-    const { token, user } = useAuth();
+    const { token } = useAuth();
     const [tasks, setTasks] = useState([]);
     const [projects, setProjects] = useState([]);
-    const [users, setUsers] = useState([]);
     const [teamMembers, setTeamMembers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -45,22 +44,16 @@ function TaskTable() {
                 fetch(`${API_BASE_URL}/projects`, {
                     headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
                 }),
-                fetch(`${API_BASE_URL}/users`, {
-                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
-                })
             ]);
 
             if (!tasksResponse.ok) throw new Error(`Task fetch failed: ${tasksResponse.status}`);
             if (!projectsResponse.ok) throw new Error(`Project fetch failed: ${projectsResponse.status}`);
-            if (!usersResponse.ok) throw new Error(`User fetch failed: ${usersResponse.status}`);
-
+            
             const tasksData = await tasksResponse.json();
             const projectsData = await projectsResponse.json();
-            const usersData = await usersResponse.json();
 
             setTasks(tasksData);
             setProjects(projectsData);
-            setUsers(usersData);
 
         } catch (e) {
             console.error("Failed to fetch data:", e);
@@ -77,23 +70,14 @@ function TaskTable() {
         }
         try {
             const response = await fetch(`${API_BASE_URL}/projects/${projectId}/team`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
+                headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
             });
             if (!response.ok) throw new Error(`Team members fetch failed: ${response.status}`);
             const teamMembersData = await response.json();
-            if (teamMembersData && Array.isArray(teamMembersData.team_members)) {
-                    setTeamMembers(
-                    teamMembersData.team_members.filter(member => member.status === 'accepted')
-                    );
-                } else {
-                    setTeamMembers([]); // fallback in case data is malformed
-                }
-            } catch (e) {
+            setTeamMembers(
+                teamMembersData.team_members.filter(member => member.status === 'accepted')
+            );              
+        } catch (e) {
             console.error("Failed to fetch team members:", e);
             setError(`Failed to load team members: ${e.message}`);
             setTeamMembers([]);
@@ -494,7 +478,6 @@ function TaskTable() {
                                         <td>{task.assigned_user?.name || 'Unassigned'}</td>
                                         <td>
                                             <div className="d-flex">
-                                                {(task.created_by === user?.id || task.assigned_user_id === user?.id) && (
                                                     <>
                                                         <Button variant="outline-secondary" size="sm" onClick={() => handleShowEditModal(task)} className="me-1">
                                                             Edit
@@ -503,7 +486,6 @@ function TaskTable() {
                                                             Delete
                                                         </Button>
                                                     </>
-                                                )}
                                                 <Button variant="outline-info" size="sm" onClick={() => handleShowCommentsModal(task.id)}>
                                                     Comments
                                                 </Button>

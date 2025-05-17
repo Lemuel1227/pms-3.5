@@ -25,6 +25,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/tasks/{task}/comments', [CommentController::class, 'store']);
     Route::get('/tasks/{task}/comments', [CommentController::class, 'index']);
 
+    Route::get('/task-notifications', [TaskController::class, 'notifyTaskAssignments']);
+    Route::get('/tasks/{task}/acknowledge', [TaskController::class, 'acknowledgeTaskAssignment']);
+
+    Route::get('/invitations', [TeamMemberController::class, 'invitations'])->name('invitations');
+
     Route::prefix('projects/{project}/team')->name('projects.team.')->middleware(['auth:sanctum'])->group(function () {
         Route::get('/', [TeamMemberController::class, 'index'])->name('index');
         Route::post('/invite', [TeamMemberController::class, 'store'])->name('store');

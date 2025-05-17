@@ -19,6 +19,18 @@ class TeamMemberController extends Controller
      * @param  int  $projectId
      * @return \Illuminate\Http\JsonResponse
      */
+    public function invitations()
+    {
+        $userId = auth('sanctum')->id();
+        $invitations = TeamMember::where('user_id', $userId)
+            ->where('status', 'pending')
+            ->with(['project', 'invited_by_user'])
+            ->get();
+
+        return response()->json($invitations);
+    }
+
+    
     public function index($projectId)
     {
         $project = Project::findOrFail($projectId);

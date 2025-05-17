@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->enum('role', ['project_creator', 'member']);
             $table->enum('status', ['pending', 'accepted'])->default('pending');
+            $table->foreignId('invited_by')->constrained('users')->onDelete('cascade');
             $table->timestamps();
         });
     }

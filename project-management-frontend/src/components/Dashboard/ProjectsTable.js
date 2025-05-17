@@ -97,17 +97,15 @@ function ProjectTable() {
                 }),
             ]);
 
-            if (!tasksResponse.ok) {
-                const errorData = await tasksResponse.json();
-                throw new Error(errorData.message || `Tasks fetch failed: ${tasksResponse.status}`);
-            }
-            if (!budgetsResponse.ok) {
-                const errorData = await budgetsResponse.json();
-                throw new Error(errorData.message || `Budgets fetch failed: ${budgetsResponse.status}`);
-            }
-
             const tasksData = await tasksResponse.json();
             const budgetsData = await budgetsResponse.json();
+
+            if (!tasksResponse.ok) {
+                throw new Error(tasksData.message || `Tasks fetch failed: ${tasksResponse.status}`);
+            }
+            if (!budgetsResponse.ok) {
+                throw new Error(budgetsData.message || `Budgets fetch failed: ${budgetsResponse.status}`);
+            }
 
             setProjectTasks(tasksData);
             setProjectBudgets(budgetsData);
@@ -118,6 +116,13 @@ function ProjectTable() {
             setTasksLoading(false);
         }
     }, [token]);
+
+    const handleBudgetAdded = useCallback((newBudget) => {
+        setProjectBudgets(prev => {
+            const updatedBudgets = [...prev, newBudget];
+            return updatedBudgets;
+        });
+    }, []);
 
     useEffect(() => {
         fetchProjects();
@@ -372,7 +377,7 @@ function ProjectTable() {
                                         onClick={() => handleShowTasksModal(project)}
                                         className="me-2"
                                     >
-                                        View Tasks
+                                        View Details
                                     </Button>
                                     {project.created_by === user?.id && (
                                         <>
@@ -509,7 +514,7 @@ function ProjectTable() {
 
             <Modal show={showTasksModal} onHide={handleCloseTasksModal} size="xl" backdrop="static" keyboard={false}>
                 <Modal.Header closeButton>
-                    <Modal.Title>Tasks for {currentProject?.name}</Modal.Title>
+                    <Modal.Title>Details for {currentProject?.name}</Modal.Title>
                 </Modal.Header>
                 <Modal.Body>
                     {currentProject && currentProject.budget && (
@@ -549,7 +554,7 @@ function ProjectTable() {
                     <Tab.Container defaultActiveKey="list">
                         <Nav variant="tabs" className="mb-3">
                             <Nav.Item>
-                                <Nav.Link eventKey="list">List View</Nav.Link>
+                                <Nav.Link eventKey="list">Tasks</Nav.Link>
                             </Nav.Item>
                             <Nav.Item>
                                 <Nav.Link eventKey="gantt">Gantt Chart</Nav.Link>
@@ -619,6 +624,7 @@ function ProjectTable() {
                                         token={token}
                                         projectBudget={currentProject.budget}
                                         isOwner={currentProject.created_by === user?.id}
+                                        onBudgetAdded={handleBudgetAdded}
                                     />
                                 )}
                             </Tab.Pane>

@@ -26,7 +26,7 @@ class TaskController extends Controller
             }
             
             $userId = auth('sanctum')->id();
-            $hasAccess = $project->created_by == $userId;
+            $hasAccess = $project->created_by == $userId || $project->teamMembers->contains('user_id', $userId);
             
             if (!$hasAccess) {
                 return response()->json(['message' => 'Access denied to this project'], 403);
@@ -70,6 +70,7 @@ class TaskController extends Controller
         $validatedData['created_by'] = auth('sanctum')->id();
         $validatedData['status'] = $validatedData['status'] ?? 'pending';
         $validatedData['priority'] = $validatedData['priority'] ?? 'medium';
+        $validatedData['notify_assigned'] = isset($validatedData['assigned_user_id']) && $validatedData['assigned_user_id'] !== auth('sanctum')->id();
 
         $project = Project::find($validatedData['project_id']);
         if (!$project || auth('sanctum')->id() !== $project->created_by) {
@@ -165,6 +166,11 @@ class TaskController extends Controller
 
         unset($validatedData['created_by']);
         
+        // Set notify_assigned if assigned_user_id changes to a new user
+        if (isset($validatedData['assigned_user_id']) && $validatedData['assigned_user_id'] !== $task->assigned_user_id) {
+            $validatedData['notify_assigned'] = $validatedData['assigned_user_id'] !== $userId;
+        }
+
         DB::beginTransaction();
         try {
             $timeLogsData = isset($validatedData['time_logs']) ? $validatedData['time_logs'] : null;
@@ -400,7 +406,10 @@ class TaskController extends Controller
             return response()->json(['message' => 'Project not found'], 404);
         }
         
-        if (auth('sanctum')->id() !== $project->created_by) {
+        $userId = auth('sanctum')->id();
+        $hasAccess = $project->created_by == $userId || $project->teamMembers->contains('user_id', $userId);
+        
+        if (!$hasAccess) {
             return response()->json(['message' => 'Access denied to this project'], 403);
         }
         
@@ -422,5 +431,34 @@ class TaskController extends Controller
             ->get();
             
         return response()->json($tasks);
+    }
+
+    public function notifyTaskAssignments(Request $request)
+    {
+        $userId = auth('sanctum')->id();
+        
+        $tasks = Task::where('assigned_user_id', $userId)
+                     ->where('notify_assigned', true)
+                     ->with(['project:id,name', 'owner:id,name'])
+                     ->get();
+        
+        return response()->json($tasks);
+    }
+
+    public function acknowledgeTaskAssignment(Task $task)
+    {
+        $userId = auth('sanctum')->id();
+        
+        if ($task->assigned_user_id !== $userId) {
+            return response()->json(['message' => 'You are not assigned to this task'], 403);
+        }
+        
+        if (!$task->notify_assigned) {
+            return response()->json(['message' => 'No notification to acknowledge'], 400);
+        }
+        
+        $task->update(['notify_assigned' => false]);
+        
+        return response()->json(['message' => 'Task assignment acknowledged']);
     }
 }

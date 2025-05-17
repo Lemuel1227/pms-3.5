@@ -14,6 +14,7 @@ class Task extends Model
         'status',      
         'priority',    
         'assigned_user_id',  
+        'notify_assigned',
         'created_by',
         'time_log',
     ];

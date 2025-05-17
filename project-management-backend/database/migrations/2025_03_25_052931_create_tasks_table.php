@@ -21,6 +21,8 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->enum('status', ['pending', 'in progress', 'completed'])->default('pending');
             $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
+            
+            $table->boolean('notify_assigned')->default(false)->after('assigned_user_id');
 
             $table->foreignId('assigned_user_id')
                 ->nullable() 

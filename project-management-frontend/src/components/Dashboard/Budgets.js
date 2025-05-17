@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button, Modal, Form, Alert, Table } from 'react-bootstrap';
 import { API_BASE_URL } from '../../App';
 
-function Budgets({ projectId, token, projectBudget, isOwner }) {
+function Budgets({ projectId, token, projectBudget, isOwner, onBudgetAdded }) {
     const [budgets, setBudgets] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -13,6 +13,7 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
         amount: '',
         description: '',
     });
+    const [refreshKey, setRefreshKey] = useState(0); 
 
     const fetchBudgets = useCallback(async () => {
         setLoading(true);
@@ -31,7 +32,7 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
             const data = await response.json();
             setBudgets(data);
         } catch (e) {
-            console.error('Failed to fetch budgets:', e);
+            console.error('Budgets: Failed to fetch budgets:', e);
             setError(`Failed to load budgets: ${e.message}`);
         } finally {
             setLoading(false);
@@ -58,6 +59,7 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
         setCurrentBudget(null);
         setFormData({ amount: '', description: '' });
         setError(null);
+        setRefreshKey(prev => prev + 1); 
     };
 
     const handleInputChange = (e) => {
@@ -74,6 +76,11 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
             return;
         }
 
+        const payload = {
+            amount: parseFloat(formData.amount),
+            description: formData.description || '',
+        };
+
         const url = isEditing
             ? `${API_BASE_URL}/projects/${projectId}/budgets/${currentBudget.id}`
             : `${API_BASE_URL}/projects/${projectId}/budgets`;
@@ -87,7 +94,7 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(payload),
             });
 
             if (!response.ok) {
@@ -95,10 +102,14 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
                 throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
 
-            fetchBudgets();
+            const data = await response.json();
+            await fetchBudgets();
+            if (onBudgetAdded && !isEditing) {
+                onBudgetAdded(data);
+            }
             handleCloseModal();
         } catch (e) {
-            console.error('Failed to save budget:', e);
+            console.error('Budgets: Failed to save budget:', e);
             setError(`Failed to save budget: ${e.message}`);
         }
     };
@@ -115,14 +126,14 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
                     },
                 });
 
-                if (!response.ok) {
+                if (!response.ok && response.status !== 204) {
                     const errorData = await response.json();
                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
 
-                fetchBudgets();
+                await fetchBudgets();
             } catch (e) {
-                console.error('Failed to delete budget:', e);
+                console.error('Budgets: Failed to delete budget:', e);
                 setError(`Failed to delete budget: ${e.message}`);
             }
         }
@@ -138,8 +149,9 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
 
     const getRemainingBudget = () => {
         if (!projectBudget) return 0;
-        const totalUsed = budgets.reduce((sum, budget) => sum + parseFloat(budget.amount), 0);
-        return parseFloat(projectBudget) - totalUsed;
+        const totalUsed = budgets.reduce((sum, budget) => sum + parseFloat(budget.amount || 0), 0);
+        const remaining = parseFloat(projectBudget) - totalUsed;
+        return remaining;
     };
 
     if (loading) return <div className="text-center">Loading budgets...</div>;
@@ -203,7 +215,7 @@ function Budgets({ projectId, token, projectBudget, isOwner }) {
                 </div>
             )}
 
-            <Modal show={showModal} onHide={handleCloseModal} backdrop="static" keyboard={false}>
+            <Modal show={showModal} onHide={handleCloseModal} backdrop="static" keyboard={false} key={refreshKey}>
                 <Modal.Header closeButton>
                     <Modal.Title>{isEditing ? 'Edit Budget' : 'Add Budget'}</Modal.Title>
                 </Modal.Header>

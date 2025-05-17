@@ -14,6 +14,7 @@ class TeamMember extends Model
         'project_id',
         'role',
         'status',
+        'invited_by_user',
     ];
 
     protected $with = ['user'];
@@ -33,4 +34,9 @@ class TeamMember extends Model
     {
         return $this->belongsTo(Project::class);
     }
+
+    public function invited_by_user()
+{
+    return $this->belongsTo(User::class, 'invited_by');
+}
 }
