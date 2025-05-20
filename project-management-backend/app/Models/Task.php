@@ -121,4 +121,9 @@ class Task extends Model
         
         return $this->status;
     }
+
+    public function files()
+    {
+        return $this->hasMany(File::class);
+    }
 }

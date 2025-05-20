@@ -8,6 +8,7 @@ use App\Http\Controllers\api\UserController;
 use App\Http\Controllers\api\CommentController;
 use App\Http\Controllers\api\TeamMemberController;
 use App\Http\Controllers\api\BudgetController;
+use App\Http\Controllers\api\FileController;
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('projects', ProjectController::class);
@@ -29,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tasks/{task}/acknowledge', [TaskController::class, 'acknowledgeTaskAssignment']);
 
     Route::get('/invitations', [TeamMemberController::class, 'invitations'])->name('invitations');
+
+    Route::post('/tasks/{task}/files', [FileController::class, 'store']);
+    Route::get('/tasks/{task}/files', [FileController::class, 'index']);
+    Route::delete('/tasks/{task}/files/{file}', [FileController::class, 'destroy']);
+    Route::get('/tasks/{task}/files/{file}/download', [FileController::class, 'download']);
 
     Route::prefix('projects/{project}/team')->name('projects.team.')->middleware(['auth:sanctum'])->group(function () {
         Route::get('/', [TeamMemberController::class, 'index'])->name('index');

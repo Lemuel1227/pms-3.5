@@ -22,12 +22,12 @@ return new class extends Migration
             $table->enum('status', ['pending', 'in progress', 'completed'])->default('pending');
             $table->enum('priority', ['low', 'medium', 'high'])->default('medium');
             
-            $table->boolean('notify_assigned')->default(false)->after('assigned_user_id');
-
             $table->foreignId('assigned_user_id')
                 ->nullable() 
                 ->constrained('users') 
                 ->onDelete('set null'); 
+
+            $table->boolean('notify_assigned')->default(false);
 
             $table->foreignId('created_by')
                 ->constrained('users') 

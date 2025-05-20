@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../App';
 import { Modal, Button, Alert, Form, Badge, Card } from 'react-bootstrap';
 import TaskComments from './TaskComments';
+import TaskFiles from './TaskFiles';
 
 function TaskTable() {
     const { token } = useAuth();
@@ -15,6 +16,7 @@ function TaskTable() {
 
     const [showModal, setShowModal] = useState(false);
     const [showCommentsModal, setShowCommentsModal] = useState(false);
+    const [showFilesModal, setShowFilesModal] = useState(false);
     const [currentTaskId, setCurrentTaskId] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [currentTask, setCurrentTask] = useState(null);
@@ -161,6 +163,11 @@ function TaskTable() {
         setShowCommentsModal(true);
     };
 
+    const handleShowFilesModal = (taskId) => {
+        setCurrentTaskId(taskId);
+        setShowFilesModal(true);
+    };
+
     const handleCloseModal = () => {
         setShowModal(false);
         setCurrentTask(null);
@@ -171,6 +178,11 @@ function TaskTable() {
 
     const handleCloseCommentsModal = () => {
         setShowCommentsModal(false);
+        setCurrentTaskId(null);
+    };
+
+    const handleCloseFilesModal = () => {
+        setShowFilesModal(false);
         setCurrentTaskId(null);
     };
 
@@ -478,17 +490,20 @@ function TaskTable() {
                                         <td>{task.assigned_user?.name || 'Unassigned'}</td>
                                         <td>
                                             <div className="d-flex">
-                                                    <>
-                                                        <Button variant="outline-secondary" size="sm" onClick={() => handleShowEditModal(task)} className="me-1">
-                                                            Edit
-                                                        </Button>
-                                                        <Button variant="outline-danger" size="sm" onClick={() => handleDelete(task.id)} className="me-1">
-                                                            Delete
-                                                        </Button>
-                                                    </>
-                                                <Button variant="outline-info" size="sm" onClick={() => handleShowCommentsModal(task.id)}>
-                                                    Comments
-                                                </Button>
+                                                <>
+                                                    <Button variant="outline-secondary" size="sm" onClick={() => handleShowEditModal(task)} className="me-1">
+                                                        Edit
+                                                    </Button>
+                                                    <Button variant="outline-danger" size="sm" onClick={() => handleDelete(task.id)} className="me-1">
+                                                        Delete
+                                                    </Button>
+                                                    <Button variant="outline-info" size="sm" onClick={() => handleShowCommentsModal(task.id)} className="me-1">
+                                                        Comments
+                                                    </Button>
+                                                    <Button variant="outline-primary" size="sm" onClick={() => handleShowFilesModal(task.id)}>
+                                                        Files
+                                                    </Button>
+                                                </>
                                             </div>
                                         </td>
                                     </tr>
@@ -624,6 +639,18 @@ function TaskTable() {
                     </Modal.Body>
                     <Modal.Footer>
                         <Button variant="secondary" onClick={handleCloseCommentsModal}>Close</Button>
+                    </Modal.Footer>
+                </Modal>
+
+                <Modal show={showFilesModal} onHide={handleCloseFilesModal} size="lg">
+                    <Modal.Header closeButton>
+                        <Modal.Title>Task Files</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>
+                        {currentTaskId && <TaskFiles taskId={currentTaskId} />}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button variant="secondary" onClick={handleCloseFilesModal}>Close</Button>
                     </Modal.Footer>
                 </Modal>
             </div>

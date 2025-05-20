@@ -57,6 +57,7 @@ class BudgetController extends Controller
         if (!$project->budget){
             return response()->json(['message' => 'No Budget allocated for the project'], 422);
         }
+        
         if ($newTotal > $project->budget) {
             return response()->json(['message' => 'Budget amount exceeds the project\'s remaining budget'], 422);
         }

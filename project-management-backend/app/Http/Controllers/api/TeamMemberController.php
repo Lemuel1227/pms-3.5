@@ -13,12 +13,6 @@ use Illuminate\Support\Facades\Gate;
 
 class TeamMemberController extends Controller
 {
-    /**
-     * Display team members for a project.
-     *
-     * @param  int  $projectId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function invitations()
     {
         $userId = auth('sanctum')->id();
@@ -30,12 +24,10 @@ class TeamMemberController extends Controller
         return response()->json($invitations);
     }
 
-    
     public function index($projectId)
     {
         $project = Project::findOrFail($projectId);
         
-        // Authorization check
         if (!Gate::allows('view', $project)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -51,18 +43,10 @@ class TeamMemberController extends Controller
         ]);
     }
 
-    /**
-     * Invite a user to join the project team.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $projectId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function store(Request $request, $projectId)
     {
         $project = Project::findOrFail($projectId);
         
-        // Authorization check
         if (!Gate::allows('view', $project)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -74,7 +58,12 @@ class TeamMemberController extends Controller
         
         $user = User::where('email', $validated['email'])->first();
         
-        // Check if user is already a team member
+        if (!auth('sanctum')->id()) {
+            return response()->json(['message' => 'Invalid inviter'], 403);
+        }
+        
+        $invited_by = auth('sanctum')->id();
+
         $existingMember = TeamMember::where('project_id', $project->id)
             ->where('user_id', $user->id)
             ->first();
@@ -85,16 +74,13 @@ class TeamMemberController extends Controller
             ], 422);
         }
         
-        // Create new team member
         $teamMember = TeamMember::create([
             'user_id' => $user->id,
             'project_id' => $project->id,
             'role' => $validated['role'],
             'status' => 'pending',
+            'invited_by' => $invited_by,
         ]);
-        
-        // Here you would typically send an invitation email to the user
-        // You can dispatch a job or event to handle this asynchronously
         
         return response()->json([
             'message' => 'Team member invitation sent successfully.',
@@ -102,19 +88,10 @@ class TeamMemberController extends Controller
         ], 201);
     }
 
-    /**
-     * Update the team member's status or role.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $projectId
-     * @param  int  $teamMemberId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function update(Request $request, $projectId, $teamMemberId)
     {
         $project = Project::findOrFail($projectId);
         
-        // Authorization check
         if (!Gate::allows('view', $project)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -136,13 +113,6 @@ class TeamMemberController extends Controller
         ]);
     }
 
-    /**
-     * Accept an invitation to join a project team.
-     *
-     * @param  int  $projectId
-     * @param  int  $teamMemberId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function acceptInvitation($projectId, $teamMemberId)
     {
         $project = Project::findOrFail($projectId);
@@ -167,13 +137,6 @@ class TeamMemberController extends Controller
         ]);
     }
 
-    /**
-     * Remove a team member from the project.
-     *
-     * @param  int  $projectId
-     * @param  int  $teamMemberId
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function destroy($projectId, $teamMemberId)
     {
         $project = Project::findOrFail($projectId);
@@ -181,12 +144,10 @@ class TeamMemberController extends Controller
             ->where('id', $teamMemberId)
             ->firstOrFail();
         
-        // Authorization check - ensure only project owner or the team member themselves can remove
         if ($project->created_by != Auth::id() && $teamMember->user_id != Auth::id()) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
         
-        // Prevent removal of project creator
         if ($teamMember->role === 'project_creator') {
             return response()->json([
                 'message' => 'The project creator cannot be removed from the project.'
