@@ -14,7 +14,7 @@ class TeamMember extends Model
         'project_id',
         'role',
         'status',
-        'invited_by_user',
+        'invited_by',
     ];
 
     protected $with = ['user'];

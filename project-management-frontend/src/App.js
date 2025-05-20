@@ -2,15 +2,14 @@ import React from 'react';
 import './App.css';
 import LoginPage from './components/login/LoginPage';
 import RegisterPage from './components/register/RegisterPage';
-import Dashboard from './components/Dashboard/Dashboard'; // Updated Path
-import ProjectTable from './components/Dashboard/ProjectsTable'; // New Import
-import TaskTable from './components/Dashboard/TasksTable';     // New Import
+import Dashboard from './components/Dashboard/Dashboard'; 
+import ProjectTable from './components/Dashboard/ProjectsTable'; 
+import TaskTable from './components/Dashboard/TasksTable';     
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Define API Base URL (Replace with your actual backend URL)
-export const API_BASE_URL = 'http://localhost:8000/api'; // Or your production URL
+export const API_BASE_URL = 'http://localhost:8000/api'; 
 
 function App() {
   return (
@@ -28,14 +27,12 @@ function App() {
                 </PrivateRoute>
               }
             >
-              {/* Nested Routes within Dashboard */}
-              <Route index element={<Navigate to="projects" replace />} /> {/* Default to projects */}
+              <Route index element={<Navigate to="projects" replace />} />
               <Route path="projects" element={<ProjectTable />} />
               <Route path="tasks" element={<TaskTable />} />
-              {/* Add more nested routes here as needed */}
             </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} /> {/* Catch-all */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>
       </AuthProvider>
@@ -48,7 +45,6 @@ function PrivateRoute({ children }) {
   const { isLoggedIn, loading } = useAuth();
 
   if (loading) {
-    // You might want a better loading indicator
     return <div className="container mt-5 text-center">Loading Authentication...</div>;
   }
 
